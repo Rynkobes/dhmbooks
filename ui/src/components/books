@@ -1,0 +1,15 @@
+else if (pick[countryIndex].warehouse[0].books === undefined) {
+			return (
+				<Styledsection bgcolor="#4ea9ad">
+					<TopSection>
+						{this.displayCountry()}
+						<Label right="-0.7cm">Select Warehouse</Label>
+						<Select onChange={this.handlePick}>
+							{pick[countryIndex].warehouse.map((warehousename) => {
+								return <option key={warehousename.warehouseID}>{warehousename.name}</option>;
+							})}
+						</Select>
+					</TopSection>
+				</Styledsection>
+			);
+}

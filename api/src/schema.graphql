@@ -1,0 +1,96 @@
+type Book{
+    bookID: ID!
+    title: String
+    warehouse: Warehouse @relation(name: "IS_IN_WAREHOUSE", direction: "OUT")
+    stock: Stock @relation(name: "HAS_STOCK", direction: "OUT")
+    language: Language @relation(name: "HAS_LANGUAGE", direction: "OUT")
+    goodsinbound: [GoodsInbound] @relation(name: "QUANTITY_DELIVERED", direction: "OUT")
+    goodsoutbound: [GoodsOutbound] @relation(name: "QUANTITY_DISPATCHED", direction: "OUT")
+}
+
+type Warehouse{
+    warehouseID: ID!
+    name: String
+    books: [Book] @relation(name: "IS_IN_WAREHOUSE", direction: "IN")
+    city: City @relation(name: "IS_IN", direction: "OUT")
+    country: Country @relation(name: "IS_IN", direction: "OUT")
+}
+
+type GoodsOutbound{
+    id: ID
+    quantity: Int
+    book: Book @relation(name: "QUANTITY_DISPATCHED", direction: "IN")
+    dispatchDate: TimeGraph @relation(name: "DISPATCHED_ON", direction: "OUT")
+}
+
+type GoodsInbound{
+    id: ID
+    quantity: Int
+    book: Book @relation(name: "QUANTITY_DELIVERED", direction: "IN")
+    deliveryDate: TimeGraph @relation(name: "DELIVERED_ON", direction: "OUT")
+}
+
+type Stock{
+    id: ID
+    balance: Int
+    book: Book @relation(name: "HAS_STOCK", direction: "IN" )
+}
+
+type Language{
+    language: String
+    booklanguage: Book @relation(name: "HAS_LANGUAGE", direction: "IN" )
+}
+
+type TimeGraph{
+    date: Date!
+    deliveryDate: GoodsInbound @relation(name: "DELIVERED_ON", direction: "OUT")
+}
+
+type City{
+    name: String
+    warehouse: [Warehouse] @relation(name: IS_IN, direction: "IN")
+    country: Country @relation(name: HAS_CITY, direction: "IN")
+}
+
+type Country{
+    name: String
+    city: [City] @relation(name: "HAS_CITY", direction: "OUT")
+    warehouse: [Warehouse] @relation(name: IS_IN, direction: "IN")
+}
+
+type Query {
+    warehousebyname(name: String):Warehouse
+    booksBywarehouse (name: String):[Book]
+    
+}
+
+type Mutation{
+    addBookCreate (warehouseID: ID, title: String, language: String) : Book
+        @cypher(
+            statement: """CREATE(b:Book{title: $title, bookID: apoc.create.uuid()}) 
+            WITH b 
+            MATCH (w:Warehouse{warehouseID: $warehouseID}),(l:Language {language: $language}) 
+            with b,l,w 
+            MERGE (w)<-[:IS_IN_WAREHOUSE]-(b)-[:HAS_LANGUAGE]-(l) 
+            WITH b CREATE(S:Stock{balance:0})<-[:HAS_STOCK]-(b) RETURN b"""
+        )
+
+transactionInbound (warehousename: String, title: String, quantity: Int, date: String, language: String): Book
+    @cypher(
+        statement: """MATCH(s:Stock)--(b:Book {title:$title})--(w:Warehouse {name:$warehousename})
+                      WHERE (b)--(:Language {language:$language})
+                      SET s.balance = s.balance + $quantity
+                      WITH b
+                      CREATE(b)-[:QUANTITY_DELIVERED]->(:GoodsInbound {quantity:toInteger($quantity)})-[:DELIVERED_ON]->(:TimeGragh {date:date($date)})"""
+        )
+
+transactionOutbound (warehousename: String, title: String, quantity: Int, date: String, language: String): Book
+    @cypher(
+        statement: """MATCH(s:Stock)--(b:Book {title:$title})--(w:Warehouse {name:$warehousename})
+                      WHERE (b)--(:Language {language:$language})
+                      SET s.balance = s.balance - $quantity
+                      WITH b
+                      CREATE(b)-[:QUANTITY_DISPATCHED]->(:GoodsOutbound {quantity:toInteger($quantity)})-[:DISPATCHED_ON]->(:TimeGragh {date:date($date)})"""
+        )
+
+}
